@@ -1,131 +1,124 @@
-Marching Cubes and Phong Shading
+# 3D Isosurface Visualization — Marching Cubes & Phong Shading
 
-Files Included:
-- main.cpp
-A C++ OpenGL program that implements marching cubes on scalar fields, renders
-the result with a Phong-like shader, supports camera interaction, and exports
-the generated mesh to PLY. Approximately 800 lines.
+A C++ and OpenGL application that generates, renders, and exports 3D isosurfaces from mathematical scalar fields using the Marching Cubes algorithm. Features interactive camera controls, Phong-style lighting, incremental mesh generation, and PLY mesh export.
 
-- TriTable.hpp
-Provided lookup table used by marching cubes to determine triangle
-configurations for each cube case.
+## Features
 
-- Generated PLY Files
-- field1.ply
-- field2.ply
+- **Marching Cubes Algorithm:** Generates triangle meshes from sampled 3D scalar fields.
+- **Interactive 3D Rendering:** Displays generated surfaces using OpenGL.
+- **Phong-Style Shading:** Implements ambient, diffuse, and specular lighting for surface illumination.
+- **Incremental Mesh Generation:** Processes approximately 300 cubes per frame, allowing the mesh to grow progressively during rendering.
+- **Camera Controls:** Rotate and zoom around the generated surface.
+- **3D Reference Geometry:** Displays a bounding box and RGB coordinate axes.
+- **PLY Export:** Saves generated meshes with vertex normals and triangle face indices for use in external 3D viewers.
+- **Numerical Edge-Case Handling:** Applies a small epsilon bias to scalar field samples near the isovalue to prevent missing triangles.
 
-Description:
-This program generates and renders triangle meshes using marching cubes
-applied to scalar fields. The mesh is constructed by evaluating the scalar
-field over a 3D grid and extracting an isosurface based on a given isovalue.
+## Supported Scalar Fields
 
-Two scalar fields are supported:
-y - sin(x)*cos(z), isovalue 0
-x^2 - y^2 - z^2 - z, isovalue -1.5
+The application supports two mathematical scalar fields:
 
-The generated mesh is rendered using OpenGL with a Phong-like lighting model
-that includes ambient, diffuse, and specular components. The program writes
-the generated mesh data (vertices and normals) to a valid PLY file.
+| Field | Scalar Function | Isovalue |
+|---|---|---|
+| Field 1 | \(y - \sin(x)\cos(z)\) | 0 |
+| Field 2 | \(x^2 - y^2 - z^2 - z\) | -1.5 |
 
-A bounding box and coordinate axes are drawn to visualize the marching volume
-and orientation in 3D space.
+The Marching Cubes algorithm samples each field across a 3D grid and interpolates intersections along cube edges to construct the resulting isosurface.
 
-Design:
-Marching cubes sampling and edge interpolation are implemented in main.cpp.
-The code supports incremental mesh generation where a chunk of cubes is
-processed per frame, so the mesh visibly grows during rendering rather than
-blocking on full computation upfront.
+## Technologies
 
-In incremental mode, runtime state (grid position, field parameters, vertices)
-is tracked and advanced via processMarchingChunk(). Each frame, approximately
-300 cubes are processed. Newly generated vertices and normals are uploaded to
-dynamic GPU buffers (GL_DYNAMIC_DRAW) so changes appear immediately.
+- **Language:** C++17
+- **Graphics API:** OpenGL 3.3+
+- **Windowing and Input:** GLFW
+- **OpenGL Extension Loading:** GLEW
+- **Mathematics:** GLM
+- **Mesh Format:** ASCII PLY
 
-Normals are generated per triangle and normalized, with the same triangle
-normal repeated for all three vertices to enable smooth shading. The code
-also includes a compute_normals() helper for batch workflows.
+## Implementation Highlights
 
-The mesh is stored in vertex buffers and rendered using Vertex Array Objects
-(VAOs) and Vertex Buffer Objects (VBOs). Rendering is done using glDrawArrays().
+### Marching Cubes and Mesh Generation
 
-A Phong-like shader is implemented:
-Vertex shader uses uniforms MVP, V, and LightDir
-Fragment shader uses uniform modelColor
-Ambient color is (0.2, 0.2, 0.2)
-Specular color is (1, 1, 1)
-Shininess is 64
+The implementation evaluates scalar field values at grid points, identifies cube configurations using a lookup table, and generates triangles along intersected edges. Mesh generation is incremental, processing a portion of the grid each frame rather than computing the entire surface before rendering.
 
-Technical Improvements:
+### OpenGL Rendering
 
-(1) Pinhole artifacts in field1:
-Early testing revealed missing triangles ("pinholes") in field1. The root cause
-was ambiguous cube configurations when the scalar field evaluated to exactly
-the isovalue at grid points. The solution adds biasSampleNearIso() which shifts
-field samples by epsilon (1e-6) when they land exactly on the isovalue. This
-resolves the ambiguity while preserving surface smoothness.
+Generated geometry is stored in Vertex Array Objects (VAOs) and Vertex Buffer Objects (VBOs). Dynamic GPU buffers are updated as new triangles are generated, and the mesh is rendered using `glDrawArrays()`.
 
-(2) Axes visibility:
-The RGB axes (red X, green Y, blue Z) were initially invisible because they share
-exact edge geometry with the bounding box. With GL_LESS depth testing, equal-depth
-axis fragments were discarded. The fix uses GL_LEQUAL for axis drawing to allow
-equal-depth passes through, restoring visibility while maintaining proper occlusion
-from the mesh.
+The shader implements Phong-style lighting with ambient, diffuse, and specular components. The specular shininess exponent is set to 64.
 
-(3) Depth test consistency:
-Initial code unnecessarily disabled depth testing before line drawing. This was
-removed to ensure consistent occlusion throughout rendering.
+### Surface Normals
 
-Bonus Implemented:
-The mesh grows incrementally during rendering instead of showing only after full
-marching is complete. Each frame advances about 300 cubes, appending geometry to
-GPU buffers. Users see smooth growth over a few seconds rather than a blockade wait.
+Triangle normals are calculated and normalized to support lighting calculations. A helper function, `compute_normals()`, is also provided for batch normal computation.
 
-PLY Output:
-When the window closes, the generated mesh data is written to:
-- field1.ply (default run)
-- field2.ply (when launched with argument: field2)
+### Numerical Robustness and Rendering Fixes
 
-Each file contains vertices with per-vertex normals and triangle face indices in
-ASCII PLY format, suitable for import into 3D viewers and analysis tools.
+- **Isovalue ambiguity:** Introduced `biasSampleNearIso()` to handle samples that fall exactly on the isovalue and reduce missing-triangle artifacts.
+- **Axis visibility:** Adjusted depth comparison during axis rendering so coordinate axes remain visible when overlapping the bounding box.
+- **Depth consistency:** Maintained depth testing during line rendering to preserve appropriate occlusion.
 
-Controls:
-- Left click + drag: rotate camera around origin
-- Up arrow: move camera closer
-- Down arrow: move camera farther
-- ESC: quit and export PLY file
+## Getting Started
 
-How to Compile:
+### Prerequisites
+
+Install a C++ compiler and the required OpenGL development libraries.
+
+**Ubuntu / Debian / WSL**
+
+```bash
+sudo apt update
+sudo apt install build-essential libglew-dev libglfw3-dev libglm-dev libgl1-mesa-dev
+```
+
+### Compilation
+
+Compile the application from the directory containing `main.cpp` and `TriTable.hpp`:
+
+```bash
 g++ main.cpp -o a5 -std=c++17 -lglfw -lGLEW -lGL
+```
 
-Required libraries (install if missing):
-- GLFW 3: windowing and input handling
-- GLEW: OpenGL extension loader
-- GLM: linear algebra
-- OpenGL 3.3+: core graphics API
+### Running the Application
 
-On Linux/WSL (Ubuntu/Debian):
-sudo apt install libglew-dev libglfw3-dev libglm-dev libgl1-mesa-dev
+Run the default scalar field:
 
-On macOS with Homebrew:
-brew install glew glfw glm
-Then compile with: g++ main.cpp -o a5 -std=c++17 -lglfw -lGLEW -framework OpenGL
-
-If compilation fails with "cannot find" errors, verify all dev packages are
-installed and check your library paths. The command above handles most systems.
-
-How to Run:
+```bash
 ./a5
-Runs the program using the first scalar field (field1)
+```
 
+Run the second scalar field:
+
+```bash
 ./a5 field2
-Runs the program using the second scalar field
+```
 
-Example:
-./a5
-./a5 field2
+The application opens an interactive window and generates the selected isosurface incrementally.
 
-Code Quality Notes:
-- Inline comments explain key sections and algorithms
-- Functions named descriptively (processMarchingChunk, biasSampleNearIso, etc.)
-- No compiler warnings under C++17
-- Robust handling of edge cases (epsilon bias, degenerate triangles)
+## Controls
+
+| Input | Action |
+|---|---|
+| Left mouse button + drag | Rotate the camera around the origin |
+| Up arrow | Move the camera closer |
+| Down arrow | Move the camera farther away |
+| ESC | Exit and export the generated mesh |
+
+## Mesh Export
+
+When the application closes, the generated mesh is exported as an ASCII PLY file:
+
+- `field1.ply` — generated using the default scalar field.
+- `field2.ply` — generated when the application is launched with the `field2` argument.
+
+The exported files contain vertex positions, vertex normals, and triangle face indices, making them suitable for inspection in compatible 3D visualization software.
+
+## Repository Contents
+
+| File | Description |
+|---|---|
+| `main.cpp` | Marching Cubes implementation, OpenGL rendering, shaders, camera controls, and PLY export |
+| `TriTable.hpp` | Lookup table used to determine triangle configurations for each cube case |
+| `field1.ply` | Example mesh exported from the first scalar field |
+| `field2.ply` | Example mesh exported from the second scalar field |
+
+## Project Context
+
+Developed as part of CS3388 — Computer Graphics, Assignment 5. The project explores procedural mesh generation, real-time 3D rendering, lighting, and numerical edge-case handling in C++ and OpenGL.
